@@ -1,6 +1,6 @@
 ###Fork description
 
-This fork is based on BWA and uses nmap files to put reference (sa, bwt) into shared memory and use it together with 
+This fork is based on BWA and uses mmap files to put reference (sa, bwt) into shared memory and use it together with 
 jbwa (https://github.com/lindenb/jbwa) for MapReduce
 
 ###Getting started
