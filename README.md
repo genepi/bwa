@@ -1,3 +1,8 @@
+###Fork description
+
+This fork is based on BWA and uses nmap files to put reference (sa, bwt) into shared memory and use it together with 
+jbwa (https://github.com/lindenb/jbwa) for MapReduce
+
 ###Getting started
 
 	git clone https://github.com/lh3/bwa.git
@@ -5,13 +10,7 @@
 	./bwa index ref.fa
 	./bwa mem ref.fa read-se.fq.gz | gzip -3 > aln-se.sam.gz
 	./bwa mem ref.fa read1.fq read2.fq | gzip -3 > aln-pe.sam.gz
-
-###Fork description
-
-This fork is based on BWA and uses nmap files to put reference (sa, bwt) into shared memory and use it together with 
-jbwa (https://github.com/lindenb/jbwa) for MapReduce
-
-
+	
 ###Introduction
 
 BWA is a software package for mapping low-divergent sequences against a large
