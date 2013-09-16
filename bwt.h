@@ -57,6 +57,7 @@ typedef struct {
 	int sa_intv;
 	bwtint_t n_sa;
 	bwtint_t *sa;
+        FILE *fp; //added by Seb
 } bwt_t;
 
 typedef struct {
