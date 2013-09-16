@@ -34,6 +34,10 @@
 #include "bwt.h"
 #include "kvec.h"
 
+#include <sys/mman.h> //added by Seb
+#include <errno.h> //added by Seb
+
+
 #ifdef USE_MALLOC_WRAPPERS
 #  include "malloc_wrap.h"
 #endif
@@ -82,7 +86,23 @@ void bwt_cal_sa(bwt_t *bwt, int intv)
 	bwt->sa[0] = (bwtint_t)-1; // before this line, bwt->sa[0] = bwt->seq_len
 }
 
+// added by Seb
 bwtint_t bwt_sa(const bwt_t *bwt, bwtint_t k)
+{
+        bwtint_t sa = 0, mask = bwt->sa_intv - 1;
+        while (k & mask) {
+                ++sa;
+                k = bwt_invPsi(bwt, k);
+        }
+
+        if (k / bwt->sa_intv == 0) {
+        return sa - 1;
+        } else {
+        return sa + bwt->sa[k / bwt->sa_intv - 1];
+        }
+}
+
+bwtint_t bwt_sa_ORG(const bwt_t *bwt, bwtint_t k)
 {
 	bwtint_t sa = 0, mask = bwt->sa_intv - 1;
 	while (k & mask) {
@@ -386,7 +406,7 @@ static bwtint_t fread_fix(FILE *fp, bwtint_t size, void *a)
 	return offset;
 }
 
-void bwt_restore_sa(const char *fn, bwt_t *bwt)
+void bwt_restore_sa_ORG(const char *fn, bwt_t *bwt)
 {
 	char skipped[256];
 	FILE *fp;
@@ -408,7 +428,69 @@ void bwt_restore_sa(const char *fn, bwt_t *bwt)
 	err_fclose(fp);
 }
 
+//added by LukFor, SebSch
+void bwt_restore_sa(const char *fn, bwt_t *bwt)
+{
+        char skipped[256];
+        FILE *fp;
+        bwtint_t primary;
+        bwtint_t *map;
+        fp = xopen(fn, "rb");
+        err_fread_noeof(&primary, sizeof(bwtint_t), 1, fp);
+        xassert(primary == bwt->primary, "SA-BWT inconsistency: primary is not the same.");
+        err_fread_noeof(skipped, sizeof(bwtint_t), 4, fp); // skip
+        err_fread_noeof(&bwt->sa_intv, sizeof(bwtint_t), 1, fp);
+        err_fread_noeof(&primary, sizeof(bwtint_t), 1, fp);
+        xassert(primary == bwt->seq_len, "SA-BWT inconsistency: seq_len is not the same.");
+
+        bwt->n_sa = (bwt->seq_len + bwt->sa_intv) / bwt->sa_intv;
+        map = (bwtint_t) mmap(0, (bwt->n_sa-1)*sizeof(bwtint_t), PROT_READ, MAP_PRIVATE | MAP_POPULATE | MAP_NORESERVE, fileno(fp), 0);
+
+         if (map == MAP_FAILED) {
+        err_fclose(fp);
+        perror("mmap");
+        abort();
+    }
+          map += 7;
+
+          bwt->sa = map;
+
+      }
+
+//added by LukFor, SebSch
 bwt_t *bwt_restore_bwt(const char *fn)
+{
+        bwt_t *bwt;
+        FILE *fp;
+        uint64_t *map;
+        bwt = (bwt_t*)calloc(1, sizeof(bwt_t));
+        fp = xopen(fn, "rb");
+        bwt->fp = fp;
+        err_fseek(fp, 0, SEEK_END);
+        bwt->bwt_size = (err_ftell(fp) - sizeof(bwtint_t) * 5) >> 2;
+        err_fseek(fp, 0, SEEK_SET);
+        err_fread_noeof(&bwt->primary, sizeof(bwtint_t), 1, fp);
+        err_fread_noeof(bwt->L2+1, sizeof(bwtint_t), 4, fp);
+
+        map = mmap(0, bwt->bwt_size*4, PROT_READ, MAP_PRIVATE | MAP_POPULATE | MAP_NORESERVE, fileno(fp), 0);
+
+        if (map == MAP_FAILED) {
+        err_fclose(fp);
+        perror("mmap");
+        abort();
+        }
+
+        map += 5;
+
+        bwt->bwt = map;
+
+        bwt->seq_len = bwt->L2[4];
+        bwt_gen_cnt_table(bwt);
+
+        return bwt;
+}
+
+bwt_t *bwt_restore_bwt_ORG(const char *fn)
 {
 	bwt_t *bwt;
 	FILE *fp;
@@ -429,7 +511,19 @@ bwt_t *bwt_restore_bwt(const char *fn)
 	return bwt;
 }
 
+//added by LukFor, SebSch
 void bwt_destroy(bwt_t *bwt)
+{
+        if (bwt == 0) return;
+        //free(bwt->sa);
+        //free(bwt->bwt);
+        munmap(bwt->bwt - 5, bwt->bwt_size * 4);
+        munmap(bwt->sa - 7 , sizeof(bwtint_t) * (bwt->n_sa - 1));
+        fclose(bwt->fp);
+        free(bwt);
+}
+
+void bwt_destroy_ORG(bwt_t *bwt)
 {
 	if (bwt == 0) return;
 	free(bwt->sa); free(bwt->bwt);
